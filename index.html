@@ -511,22 +511,27 @@ function loadTrack(i) {
   bubble.classList.add('fade');
   setTimeout(() => { bubble.textContent = t.dj; bubble.classList.remove('fade'); }, 250);
 
-  // ── YOUTUBE: pre-load silently, play AFTER DJ ──
-  // cueVideoById loads the video WITHOUT playing audio.
-  // This prevents iOS killing the DJ audio when two sources
-  // compete for the audio session simultaneously.
+  // ── FM RADIO DUCKING ──
+  // YouTube starts at 0% so iOS registers it without competing
+  // with the DJ audio. After 1s we gently raise it to 15% as a
+  // music bed under Cara. After she finishes, full fade to 100%.
   setYTVolume(0);
-  if (player && player.cueVideoById) player.cueVideoById(t.id);
-
-  // DJ speaks first — music fades in after she finishes
   document.getElementById('vol-indicator').classList.add('show');
   document.getElementById('vol-bar').style.width = '0%';
+  if (player && player.loadVideoById) player.loadVideoById(t.id);
 
   playDJIntro(t.mp3, () => {
-    // DJ done — start YouTube and fade from 0 → 100%
-    if (player && player.playVideo) player.playVideo();
-    fadeVolume(0, FULL_VOL, 2000);
+    // DJ done — fade music from 15% → 100%
+    fadeVolume(DJ_VOL, FULL_VOL, 1500);
   });
+
+  // After 1s, quietly raise music bed to 15% while DJ is still speaking
+  setTimeout(() => {
+    const dots = document.getElementById('dj-dots');
+    if (dots.classList.contains('active')) {
+      fadeVolume(0, DJ_VOL, 1000);
+    }
+  }, 1000);
 }
 
 function nextTrack() { loadTrack((idx + 1) % queue.length); }
