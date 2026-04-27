@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>CLAUDEDIO FM</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+:root {
+  --bg: #09090f;
+  --card: #13131c;
+  --border: #1e1e2e;
+  --accent: #c084fc;
+  --accent2: #818cf8;
+  --text: #f1f1f5;
+  --sub: #6b7280;
+  --like: #f472b6;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  overflow-x: hidden;
+}
+
+#app {
+  width: 100%;
+  max-width: 430px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 40px;
+}
+
+/* ── Loading ── */
+#loading {
+  position: fixed; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  background: var(--bg); gap: 20px; z-index: 99;
+}
+.loading-ring {
+  width: 48px; height: 48px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+.loading-label { font-size: 11px; letter-spacing: 5px; color: var(--sub); text-transform: uppercase; }
+
+/* ── Tap to Start ── */
+#start-screen {
+  position: fixed; inset: 0; z-index: 98;
+  background: var(--bg);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 28px;
+}
+.start-logo { font-size: 13px; font-weight: 800; letter-spacing: 6px; color: var(--accent); text-transform: uppercase; }
+.start-vinyl {
+  width: 160px; height: 160px; border-radius: 50%;
+  background: conic-gradient(#1a0a2e,#16083e,#1f1060,#2d1280,#1a0a2e,#160a3e,#1f1060);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 60px rgba(192,132,252,0.2);
+  animation: pulse 2.5s ease-in-out infinite;
+}
+.start-vinyl-center {
+  width: 50px; height: 50px; border-radius: 50%;
+  background: var(--bg); display: flex; align-items: center; justify-content: center;
+}
+.start-vinyl-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); }
+@keyframes pulse { 0%,100%{box-shadow:0 0 40px rgba(192,132,252,0.15)} 50%{box-shadow:0 0 80px rgba(192,132,252,0.35)} }
+.start-btn {
+  padding: 16px 48px; border: none; border-radius: 50px; cursor: pointer;
+  background: linear-gradient(135deg, var(--accent2), var(--accent));
+  color: #fff; font-size: 16px; font-weight: 700; letter-spacing: 0.5px;
+  box-shadow: 0 0 32px rgba(192,132,252,0.4);
+}
+.start-btn:active { transform: scale(0.96); }
+.start-sub { font-size: 12px; color: var(--sub); }
+
+/* ── Header ── */
+.header {
+  padding: 54px 24px 0;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.station-name { font-size: 11px; font-weight: 800; letter-spacing: 5px; color: var(--accent); text-transform: uppercase; }
+.signal { display: flex; align-items: flex-end; gap: 3px; }
+.sig-bar { width: 3px; background: var(--accent); border-radius: 2px; animation: sig 1.4s ease-in-out infinite; }
+.sig-bar:nth-child(1) { height: 5px;  animation-delay: 0s; }
+.sig-bar:nth-child(2) { height: 9px;  animation-delay: 0.1s; }
+.sig-bar:nth-child(3) { height: 14px; animation-delay: 0.2s; }
+.sig-bar:nth-child(4) { height: 9px;  animation-delay: 0.3s; }
+.sig-bar:nth-child(5) { height: 5px;  animation-delay: 0.4s; }
+@keyframes sig { 0%,100%{opacity:.25} 50%{opacity:1} }
+
+/* ── Vinyl ── */
+.artwork-area { padding: 28px 40px 20px; display: flex; justify-content: center; }
+.vinyl {
+  width: 210px; height: 210px; border-radius: 50%; flex-shrink: 0;
+  background: conic-gradient(#1a0a2e,#160a3e,#1f1060,#2d1280,#1a0a2e,#160a3e,#1f1060);
+  display: flex; align-items: center; justify-content: center;
+  animation: spin 9s linear infinite; animation-play-state: paused;
+  box-shadow: 0 0 50px rgba(192,132,252,0.15), 0 0 100px rgba(129,140,248,0.08);
+}
+.vinyl.playing { animation-play-state: running; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.vinyl-center { width: 64px; height: 64px; border-radius: 50%; background: var(--bg); display: flex; align-items: center; justify-content: center; }
+.vinyl-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); opacity: 0.8; }
+
+/* ── Song Info ── */
+.song-info { padding: 0 24px; text-align: center; }
+.song-title { font-size: 22px; font-weight: 700; line-height: 1.2; margin-bottom: 7px; letter-spacing: -0.3px; }
+.song-artist { font-size: 14px; color: var(--sub); margin-bottom: 6px; }
+.song-meta { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.song-year { font-size: 11px; color: var(--accent); font-weight: 700; letter-spacing: 1.5px; }
+.rec-tag { font-size: 9px; background: rgba(192,132,252,0.12); color: var(--accent); padding: 3px 8px; border-radius: 20px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; display: none; }
+.rec-tag.show { display: inline-block; }
+
+/* ── DJ Cara ── */
+.dj-section { margin: 20px 20px 0; }
+.dj-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.dj-avatar { width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0; background: linear-gradient(135deg, var(--accent), var(--accent2)); display: flex; align-items: center; justify-content: center; font-size: 15px; }
+.dj-name { font-size: 11px; font-weight: 800; letter-spacing: 1.5px; color: var(--accent); text-transform: uppercase; }
+.dj-dots { display: none; align-items: center; gap: 3px; margin-left: auto; }
+.dj-dots.active { display: flex; }
+.dj-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); animation: djbounce 0.7s ease-in-out infinite; }
+.dj-dot:nth-child(2) { animation-delay: 0.15s; }
+.dj-dot:nth-child(3) { animation-delay: 0.3s; }
+@keyframes djbounce { 0%,100%{transform:translateY(0);opacity:.3} 50%{transform:translateY(-5px);opacity:1} }
+.dj-bubble { background: var(--card); border: 1px solid var(--border); border-radius: 18px; border-top-left-radius: 4px; padding: 14px 16px; font-size: 13.5px; line-height: 1.65; color: #c4c4d4; min-height: 72px; transition: opacity 0.25s ease; }
+.dj-bubble.fade { opacity: 0; }
+.skip-intro-btn { margin-top: 8px; margin-left: auto; display: block; background: none; border: none; font-size: 11px; color: var(--sub); cursor: pointer; padding: 4px 0; text-decoration: underline; text-underline-offset: 3px; }
+.skip-intro-btn:active { color: var(--text); }
+
+/* ── Volume Indicator (ducking) ── */
+.vol-indicator { display: flex; align-items: center; gap: 6px; margin: 8px 20px 0; opacity: 0; transition: opacity 0.3s; }
+.vol-indicator.show { opacity: 1; }
+.vol-bar-wrap { flex: 1; height: 2px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.vol-bar-fill { height: 100%; background: var(--accent2); border-radius: 2px; transition: width 0.3s ease; width: 15%; }
+.vol-label { font-size: 10px; color: var(--sub); letter-spacing: 0.5px; white-space: nowrap; }
+
+/* ── Progress ── */
+.progress-section { padding: 18px 24px 0; }
+.progress-track { height: 3px; background: var(--border); border-radius: 3px; cursor: pointer; overflow: hidden; }
+.progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent2), var(--accent)); border-radius: 3px; transition: width 0.5s linear; }
+.time-row { display: flex; justify-content: space-between; margin-top: 8px; font-size: 11px; color: var(--sub); }
+
+/* ── Controls ── */
+.controls { padding: 20px 24px 0; display: flex; align-items: center; justify-content: center; gap: 20px; }
+.ctrl { background: none; border: none; cursor: pointer; color: var(--sub); display: flex; align-items: center; justify-content: center; padding: 10px; border-radius: 50%; transition: color 0.15s, transform 0.1s; }
+.ctrl:active { transform: scale(0.88); color: var(--text); }
+.ctrl.big { width: 68px; height: 68px; background: linear-gradient(135deg, var(--accent2), var(--accent)); color: #fff; border-radius: 50%; box-shadow: 0 0 28px rgba(192,132,252,0.45); }
+.ctrl.big:active { box-shadow: 0 0 14px rgba(192,132,252,0.3); }
+
+/* ── Like / Dislike ── */
+.rating-section { padding: 18px 20px 0; display: flex; gap: 12px; }
+.rate-btn { flex: 1; padding: 15px 10px; border: 1px solid var(--border); border-radius: 16px; background: var(--card); color: var(--sub); font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; transition: all 0.15s; }
+.rate-btn:active { transform: scale(0.96); }
+.rate-btn.liked { background: rgba(244,114,182,0.1); border-color: var(--like); color: var(--like); }
+.rate-btn.disliked { background: rgba(30,30,46,0.8); border-color: #2a2a3e; color: #3d3d55; }
+
+/* ── Footer ── */
+.footer { padding: 14px 24px 0; display: flex; justify-content: space-between; align-items: center; }
+.track-count { font-size: 11px; color: var(--sub); }
+.liked-tally { font-size: 11px; color: var(--accent); }
+
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<!-- Hidden YouTube player -->
+<div id="yt-player" style="position:fixed;top:-999px;left:-999px;width:1px;height:1px;opacity:0;pointer-events:none;"></div>
+
+<!-- Hidden DJ audio element — plays ElevenLabs MP3s -->
+<audio id="dj-audio" preload="auto"></audio>
+
+<!-- Loading -->
+<div id="loading">
+  <div class="loading-ring"></div>
+  <div class="loading-label">Claudedio</div>
+</div>
+
+<!-- Tap to Start -->
+<div id="start-screen" class="hidden">
+  <div class="start-logo">Claudedio FM</div>
+  <div class="start-vinyl">
+    <div class="start-vinyl-center"><div class="start-vinyl-dot"></div></div>
+  </div>
+  <button class="start-btn" onclick="startRadio()">Tap to Start</button>
+  <div class="start-sub">DJ Cara is ready. Are you?</div>
+</div>
+
+<!-- App -->
+<div id="app" class="hidden">
+
+  <div class="header">
+    <div class="station-name">Claudedio FM</div>
+    <div class="signal">
+      <div class="sig-bar"></div><div class="sig-bar"></div><div class="sig-bar"></div>
+      <div class="sig-bar"></div><div class="sig-bar"></div>
+    </div>
+  </div>
+
+  <div class="artwork-area">
+    <div class="vinyl" id="vinyl">
+      <div class="vinyl-center"><div class="vinyl-dot"></div></div>
+    </div>
+  </div>
+
+  <div class="song-info">
+    <div class="song-title" id="song-title">—</div>
+    <div class="song-artist" id="song-artist">—</div>
+    <div class="song-meta">
+      <span class="song-year" id="song-year">—</span>
+      <span class="rec-tag" id="rec-tag">DJ Cara Pick</span>
+    </div>
+  </div>
+
+  <div class="dj-section">
+    <div class="dj-header">
+      <div class="dj-avatar">🎙</div>
+      <div class="dj-name">DJ Cara</div>
+      <div class="dj-dots" id="dj-dots">
+        <div class="dj-dot"></div><div class="dj-dot"></div><div class="dj-dot"></div>
+      </div>
+    </div>
+    <div class="dj-bubble" id="dj-bubble">Good day. You're tuned in to Claudedio FM. I'm DJ Cara.</div>
+    <button class="skip-intro-btn" onclick="skipIntro()">skip intro</button>
+  </div>
+
+  <!-- Volume ducking indicator -->
+  <div class="vol-indicator" id="vol-indicator">
+    <span class="vol-label">vol</span>
+    <div class="vol-bar-wrap"><div class="vol-bar-fill" id="vol-bar"></div></div>
+  </div>
+
+  <div class="progress-section">
+    <div class="progress-track" id="progress-track">
+      <div class="progress-fill" id="progress-fill"></div>
+    </div>
+    <div class="time-row"><span id="time-cur">0:00</span><span id="time-tot">0:00</span></div>
+  </div>
+
+  <div class="controls">
+    <button class="ctrl" onclick="prevTrack()">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
+    </button>
+    <button class="ctrl big" onclick="togglePlay()">
+      <svg id="ico-play" width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+      <svg id="ico-pause" width="30" height="30" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+    </button>
+    <button class="ctrl" onclick="nextTrack()">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zm2-8.14L11.03 12 8 14.14V9.86zM16 6h2v12h-2z"/></svg>
+    </button>
+  </div>
+
+  <div class="rating-section">
+    <button class="rate-btn" id="btn-like" onclick="rate('like')"><span>❤️</span><span>Like it</span></button>
+    <button class="rate-btn" id="btn-dislike" onclick="rate('dislike')"><span>👎</span><span>Skip it</span></button>
+  </div>
+
+  <div class="footer">
+    <div class="track-count" id="track-count">Track 1 of 2</div>
+    <div class="liked-tally" id="liked-tally"></div>
+  </div>
+
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+//  PLAYLIST  (2 tracks for testing)
+// ─────────────────────────────────────────────
+const TRACKS = [
+  {
+    id:  'tBfWb5IrbOI',
+    title:  '90210',
+    artist: 'Travis Scott ft. Kacy Hill',
+    year:   2015,
+    rec:    false,
+    mp3:    'audio/cara_001.mp3',
+    dj:     "Coming up — Travis Scott with 90210 from Rodeo, 2015. Five minutes and forty seconds of pure atmosphere. Travis Scott, whose real name is Jacques Webster the Second, started performing at sixteen in a church in Houston. Then he made 90210. Quite the career arc. Turn it up."
+  },
+  {
+    id:  '9rygYJn7AJQ',
+    title:  'L$D',
+    artist: 'A$AP Rocky',
+    year:   2015,
+    rec:    false,
+    mp3:    'audio/cara_002.mp3',
+    dj:     "You're tuned in to Claudedio FM — I'm DJ Cara, and I do hope you're comfortable. Coming up, A$AP Rocky with L$D, from AT.LONG.LAST.A$AP, 2015. Rocky reportedly named the album during a mushroom trip. That is not a euphemism. That is just what happened."
+  }
+];
+
+// ─────────────────────────────────────────────
+//  AUDIO KEEP-ALIVE  (iOS lock screen fix)
+// ─────────────────────────────────────────────
+let keepAliveCtx = null;
+
+function initAudioKeepAlive() {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    keepAliveCtx = new AC();
+    const buf  = keepAliveCtx.createBuffer(1, keepAliveCtx.sampleRate, keepAliveCtx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < buf.length; i++) data[i] = (Math.random() - 0.5) * 0.0002;
+    const gain = keepAliveCtx.createGain();
+    gain.gain.value = 0.001;
+    const src  = keepAliveCtx.createBufferSource();
+    src.buffer = buf;
+    src.loop   = true;
+    src.connect(gain);
+    gain.connect(keepAliveCtx.destination);
+    src.start(0);
+  } catch(e) {}
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && keepAliveCtx && keepAliveCtx.state === 'suspended') {
+    keepAliveCtx.resume().catch(() => {});
+  }
+});
+
+// ─────────────────────────────────────────────
+//  STATE
+// ─────────────────────────────────────────────
+const queue = [...TRACKS]; // no shuffle needed for 2-track test
+let idx      = 0;
+let playing  = false;
+let progTimer = null;
+let fadeTicker = null;       // audio ducking fade timer
+const DJ_VOL   = 15;         // music volume while DJ speaks (%)
+const FULL_VOL = 100;
+
+// ─────────────────────────────────────────────
+//  PREFS (localStorage)
+// ─────────────────────────────────────────────
+function getPrefs() { try { return JSON.parse(localStorage.getItem('claudedio') || '{}'); } catch { return {}; } }
+function setPref(id, val) { const p = getPrefs(); p[id] = val; try { localStorage.setItem('claudedio', JSON.stringify(p)); } catch {} }
+function getPref(id) { return getPrefs()[id] || null; }
+
+// ─────────────────────────────────────────────
+//  YOUTUBE PLAYER
+// ─────────────────────────────────────────────
+let player;
+
+window.onYouTubeIframeAPIReady = function() {
+  player = new YT.Player('yt-player', {
+    height: '1', width: '1',
+    playerVars: { autoplay: 0, controls: 0, disablekb: 1, fs: 0, iv_load_policy: 3, rel: 0 },
+    events: { onReady: onPlayerReady, onStateChange: onStateChange }
+  });
+};
+
+function onPlayerReady() {
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('start-screen').classList.remove('hidden');
+}
+
+function onStateChange(e) {
+  if (e.data === YT.PlayerState.PLAYING)  { setPlaying(true);  startProgress(); }
+  if (e.data === YT.PlayerState.PAUSED)   { setPlaying(false); stopProgress();  }
+  if (e.data === YT.PlayerState.ENDED)    { nextTrack(); }
+}
+
+// ─────────────────────────────────────────────
+//  START RADIO  (iOS audio unlock on user tap)
+// ─────────────────────────────────────────────
+function startRadio() {
+  // 1. Silent keep-alive loop — holds iOS audio session through lock screen
+  initAudioKeepAlive();
+
+  // 2. Unlock HTML <audio> element on iOS (must be from user gesture)
+  const djAudio = document.getElementById('dj-audio');
+  djAudio.src    = TRACKS[0].mp3;
+  djAudio.volume = 0;
+  const p = djAudio.play();
+  if (p) p.then(() => { djAudio.pause(); djAudio.currentTime = 0; djAudio.volume = 1; }).catch(() => { djAudio.volume = 1; });
+
+  // 3. Unlock YouTube audio session
+  if (player) {
+    player.playVideo();
+    setTimeout(() => { if (player) player.pauseVideo(); }, 200);
+  }
+
+  document.getElementById('start-screen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+
+  // Small buffer so iOS registers all unlocks before we start
+  setTimeout(() => loadTrack(0), 400);
+}
+
+// ─────────────────────────────────────────────
+//  AUDIO DUCKING
+// ─────────────────────────────────────────────
+function setYTVolume(v) {
+  if (player && player.setVolume) player.setVolume(Math.round(Math.max(0, Math.min(100, v))));
+  // Update the visual volume indicator
+  document.getElementById('vol-bar').style.width = v + '%';
+}
+
+function fadeVolume(from, to, ms) {
+  if (fadeTicker) { clearInterval(fadeTicker); fadeTicker = null; }
+  const steps   = 40;
+  const stepMs  = ms / steps;
+  let step      = 0;
+  fadeTicker = setInterval(() => {
+    step++;
+    setYTVolume(from + ((to - from) * step / steps));
+    if (step >= steps) {
+      clearInterval(fadeTicker);
+      fadeTicker = null;
+      setYTVolume(to);
+      // Hide volume indicator once fully faded up
+      if (to >= FULL_VOL) document.getElementById('vol-indicator').classList.remove('show');
+    }
+  }, stepMs);
+}
+
+// ─────────────────────────────────────────────
+//  DJ CARA MP3 PLAYBACK
+// ─────────────────────────────────────────────
+function playDJIntro(mp3path, onDone) {
+  const audio = document.getElementById('dj-audio');
+  audio.src    = mp3path;
+  audio.volume = 1;
+
+  let finished = false;
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    hideDJDots();
+    if (onDone) onDone();
+  };
+
+  audio.onended = finish;
+  audio.onerror = finish;
+  // Safety fallback — if the file fails to load/play, don't freeze
+  setTimeout(finish, 35000);
+
+  showDJDots();
+  audio.play().catch(finish);
+}
+
+function showDJDots() { document.getElementById('dj-dots').classList.add('active'); }
+function hideDJDots()  { document.getElementById('dj-dots').classList.remove('active'); }
+
+function skipIntro() {
+  const audio = document.getElementById('dj-audio');
+  audio.pause();
+  audio.currentTime = 0;
+  hideDJDots();
+  // Cancel any in-progress fade and jump straight to full volume
+  if (fadeTicker) { clearInterval(fadeTicker); fadeTicker = null; }
+  setYTVolume(FULL_VOL);
+  document.getElementById('vol-indicator').classList.remove('show');
+}
+
+// ─────────────────────────────────────────────
+//  TRACK MANAGEMENT
+// ─────────────────────────────────────────────
+function loadTrack(i) {
+  idx = i;
+  const t = queue[idx];
+
+  // Stop any playing DJ audio and cancel any fade in progress
+  const djAudio = document.getElementById('dj-audio');
+  djAudio.pause();
+  djAudio.currentTime = 0;
+  if (fadeTicker) { clearInterval(fadeTicker); fadeTicker = null; }
+
+  // Update UI
+  document.getElementById('song-title').textContent  = t.title;
+  document.getElementById('song-artist').textContent = t.artist;
+  document.getElementById('song-year').textContent   = t.year;
+  const rt = document.getElementById('rec-tag');
+  t.rec ? rt.classList.add('show') : rt.classList.remove('show');
+  document.getElementById('track-count').textContent = `Track ${idx + 1} of ${queue.length}`;
+  updateRatingUI(t.id);
+  updateTally();
+
+  // Reset progress
+  stopProgress();
+  setPlaying(false);
+  document.getElementById('progress-fill').style.width = '0%';
+  document.getElementById('time-cur').textContent = '0:00';
+  document.getElementById('time-tot').textContent = '0:00';
+
+  // Update DJ bubble text
+  const bubble = document.getElementById('dj-bubble');
+  bubble.classList.add('fade');
+  setTimeout(() => { bubble.textContent = t.dj; bubble.classList.remove('fade'); }, 250);
+
+  // ── AUDIO DUCKING ──
+  // Start YouTube at low volume as music bed under DJ
+  setYTVolume(DJ_VOL);
+  document.getElementById('vol-bar').style.width = DJ_VOL + '%';
+  document.getElementById('vol-indicator').classList.add('show');
+  if (player && player.loadVideoById) player.loadVideoById(t.id);
+
+  // Play DJ intro, then fade music up to full volume
+  playDJIntro(t.mp3, () => {
+    fadeVolume(DJ_VOL, FULL_VOL, 1500);
+  });
+}
+
+function nextTrack() { loadTrack((idx + 1) % queue.length); }
+
+function prevTrack() {
+  const cur = player && player.getCurrentTime ? player.getCurrentTime() : 0;
+  cur > 3 ? (player && player.seekTo(0, true)) : loadTrack((idx - 1 + queue.length) % queue.length);
+}
+
+function togglePlay() {
+  if (!player) return;
+  const djAudio = document.getElementById('dj-audio');
+  // If DJ is speaking, tap = skip intro
+  if (!djAudio.paused) { skipIntro(); return; }
+  const state = player.getPlayerState ? player.getPlayerState() : -1;
+  state === YT.PlayerState.PLAYING ? player.pauseVideo() : player.playVideo();
+}
+
+function setPlaying(val) {
+  playing = val;
+  const vinyl = document.getElementById('vinyl');
+  val ? vinyl.classList.add('playing') : vinyl.classList.remove('playing');
+  document.getElementById('ico-play').style.display  = val ? 'none'  : 'block';
+  document.getElementById('ico-pause').style.display = val ? 'block' : 'none';
+}
+
+// ─────────────────────────────────────────────
+//  PROGRESS
+// ─────────────────────────────────────────────
+function startProgress() {
+  stopProgress();
+  progTimer = setInterval(() => {
+    if (!player || !player.getCurrentTime) return;
+    const cur = player.getCurrentTime() || 0;
+    const tot = player.getDuration()    || 0;
+    if (tot > 0) document.getElementById('progress-fill').style.width = (cur / tot * 100) + '%';
+    document.getElementById('time-cur').textContent = fmt(cur);
+    document.getElementById('time-tot').textContent = fmt(tot);
+  }, 500);
+}
+function stopProgress() { if (progTimer) { clearInterval(progTimer); progTimer = null; } }
+function fmt(s) { const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2,'0')}`; }
+
+document.getElementById('progress-track').addEventListener('click', function(e) {
+  if (!player || !player.getDuration) return;
+  player.seekTo((e.clientX - this.getBoundingClientRect().left) / this.offsetWidth * (player.getDuration() || 0), true);
+});
+
+// ─────────────────────────────────────────────
+//  RATING
+// ─────────────────────────────────────────────
+function rate(action) {
+  const t = queue[idx];
+  setPref(t.id, getPref(t.id) === action ? null : action);
+  updateRatingUI(t.id);
+  updateTally();
+  if (action === 'dislike') setTimeout(nextTrack, 500);
+}
+function updateRatingUI(id) {
+  const p = getPref(id);
+  document.getElementById('btn-like').className    = 'rate-btn' + (p === 'like'    ? ' liked'    : '');
+  document.getElementById('btn-dislike').className = 'rate-btn' + (p === 'dislike' ? ' disliked' : '');
+}
+function updateTally() {
+  const n = Object.values(getPrefs()).filter(v => v === 'like').length;
+  document.getElementById('liked-tally').textContent = n > 0 ? `❤️ ${n} liked` : '';
+}
+</script>
+<script src="https://www.youtube.com/iframe_api"></script>
+</body>
+</html>
