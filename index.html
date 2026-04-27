@@ -378,12 +378,14 @@ function startRadio() {
   // 1. Silent keep-alive loop — holds iOS audio session through lock screen
   initAudioKeepAlive();
 
-  // 2. Unlock HTML <audio> element on iOS (must be from user gesture)
-  const djAudio = document.getElementById('dj-audio');
-  djAudio.src    = TRACKS[0].mp3;
-  djAudio.volume = 0;
-  const p = djAudio.play();
-  if (p) p.then(() => { djAudio.pause(); djAudio.currentTime = 0; djAudio.volume = 1; }).catch(() => { djAudio.volume = 1; });
+  // 2. Unlock HTML <audio> on iOS using a throwaway silent element
+  //    (DO NOT use dj-audio here — the .then() pause would race with loadTrack
+  //    and cut Cara off mid-sentence at ~2 seconds)
+  try {
+    const sil = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=');
+    sil.volume = 0;
+    sil.play().catch(() => {});
+  } catch(e) {}
 
   // 3. Unlock YouTube audio session
   if (player) {
