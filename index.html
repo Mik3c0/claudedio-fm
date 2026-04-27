@@ -180,7 +180,10 @@ body {
 <div id="yt-player" style="position:fixed;top:-999px;left:-999px;width:1px;height:1px;opacity:0;pointer-events:none;"></div>
 
 <!-- Hidden DJ audio element — plays ElevenLabs MP3s -->
-<audio id="dj-audio" preload="auto"></audio>
+<audio id="dj-audio" preload="auto" playsinline></audio>
+
+<!-- Silent looping audio — keeps iOS audio session alive through lock screen -->
+<audio id="keep-alive" loop playsinline style="display:none"></audio>
 
 <!-- Loading -->
 <div id="loading">
@@ -301,31 +304,46 @@ const TRACKS = [
 
 // ─────────────────────────────────────────────
 //  AUDIO KEEP-ALIVE  (iOS lock screen fix)
+//  A looping <audio> element playing near-silent
+//  WAV is more reliable than Web Audio API on iOS.
+//  iOS keeps the audio session alive as long as
+//  an <audio> element is actively playing.
 // ─────────────────────────────────────────────
-let keepAliveCtx = null;
+function createSilentWav() {
+  // Generate 2 seconds of silence at 8kHz mono 16-bit PCM
+  const sampleRate = 8000;
+  const numSamples = sampleRate * 2;
+  const buf  = new ArrayBuffer(44 + numSamples * 2);
+  const view = new DataView(buf);
+  const str  = (off, s) => { for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i)); };
+  str(0,  'RIFF');  view.setUint32(4,  36 + numSamples * 2, true);
+  str(8,  'WAVE');  str(12, 'fmt ');
+  view.setUint32(16, 16, true);   // chunk size
+  view.setUint16(20,  1, true);   // PCM
+  view.setUint16(22,  1, true);   // mono
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32,  2, true);   // block align
+  view.setUint16(34, 16, true);   // bits per sample
+  str(36, 'data'); view.setUint32(40, numSamples * 2, true);
+  // samples stay 0 = silence
+  return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+}
 
-function initAudioKeepAlive() {
+function startKeepAlive() {
   try {
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return;
-    keepAliveCtx = new AC();
-    const buf  = keepAliveCtx.createBuffer(1, keepAliveCtx.sampleRate, keepAliveCtx.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < buf.length; i++) data[i] = (Math.random() - 0.5) * 0.0002;
-    const gain = keepAliveCtx.createGain();
-    gain.gain.value = 0.001;
-    const src  = keepAliveCtx.createBufferSource();
-    src.buffer = buf;
-    src.loop   = true;
-    src.connect(gain);
-    gain.connect(keepAliveCtx.destination);
-    src.start(0);
+    const ka = document.getElementById('keep-alive');
+    ka.src    = createSilentWav();
+    ka.volume = 0.001; // near-silent but NOT zero — iOS won't suspend a playing audio element
+    ka.play().catch(() => {});
   } catch(e) {}
 }
 
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && keepAliveCtx && keepAliveCtx.state === 'suspended') {
-    keepAliveCtx.resume().catch(() => {});
+  // Resume keep-alive and YouTube if they paused during lock screen
+  if (document.visibilityState === 'visible') {
+    const ka = document.getElementById('keep-alive');
+    if (ka.paused) ka.play().catch(() => {});
   }
 });
 
@@ -375,19 +393,10 @@ function onStateChange(e) {
 //  START RADIO  (iOS audio unlock on user tap)
 // ─────────────────────────────────────────────
 function startRadio() {
-  // 1. Silent keep-alive loop — holds iOS audio session through lock screen
-  initAudioKeepAlive();
+  // 1. Start looping silent audio — keeps iOS audio session alive through lock screen
+  startKeepAlive();
 
-  // 2. Unlock HTML <audio> on iOS using a throwaway silent element
-  //    (DO NOT use dj-audio here — the .then() pause would race with loadTrack
-  //    and cut Cara off mid-sentence at ~2 seconds)
-  try {
-    const sil = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=');
-    sil.volume = 0;
-    sil.play().catch(() => {});
-  } catch(e) {}
-
-  // 3. Unlock YouTube audio session
+  // 2. Unlock YouTube audio session from user gesture
   if (player) {
     player.playVideo();
     setTimeout(() => { if (player) player.pauseVideo(); }, 200);
@@ -396,7 +405,7 @@ function startRadio() {
   document.getElementById('start-screen').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
 
-  // Small buffer so iOS registers all unlocks before we start
+  // Small buffer so iOS registers the unlocks before first track loads
   setTimeout(() => loadTrack(0), 400);
 }
 
@@ -460,8 +469,9 @@ function skipIntro() {
   audio.pause();
   audio.currentTime = 0;
   hideDJDots();
-  // Cancel any in-progress fade and jump straight to full volume
+  // Cancel any in-progress fade, start YouTube immediately at full volume
   if (fadeTicker) { clearInterval(fadeTicker); fadeTicker = null; }
+  if (player && player.playVideo) player.playVideo();
   setYTVolume(FULL_VOL);
   document.getElementById('vol-indicator').classList.remove('show');
 }
@@ -501,16 +511,21 @@ function loadTrack(i) {
   bubble.classList.add('fade');
   setTimeout(() => { bubble.textContent = t.dj; bubble.classList.remove('fade'); }, 250);
 
-  // ── AUDIO DUCKING ──
-  // Start YouTube at low volume as music bed under DJ
-  setYTVolume(DJ_VOL);
-  document.getElementById('vol-bar').style.width = DJ_VOL + '%';
-  document.getElementById('vol-indicator').classList.add('show');
-  if (player && player.loadVideoById) player.loadVideoById(t.id);
+  // ── YOUTUBE: pre-load silently, play AFTER DJ ──
+  // cueVideoById loads the video WITHOUT playing audio.
+  // This prevents iOS killing the DJ audio when two sources
+  // compete for the audio session simultaneously.
+  setYTVolume(0);
+  if (player && player.cueVideoById) player.cueVideoById(t.id);
 
-  // Play DJ intro, then fade music up to full volume
+  // DJ speaks first — music fades in after she finishes
+  document.getElementById('vol-indicator').classList.add('show');
+  document.getElementById('vol-bar').style.width = '0%';
+
   playDJIntro(t.mp3, () => {
-    fadeVolume(DJ_VOL, FULL_VOL, 1500);
+    // DJ done — start YouTube and fade from 0 → 100%
+    if (player && player.playVideo) player.playVideo();
+    fadeVolume(0, FULL_VOL, 2000);
   });
 }
 
